@@ -41,6 +41,42 @@
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(p) (((size_t)(p) + (ALIGNMENT-1)) & ~0x7)
 
+/* Basic constants and macros */
+#define HDRSIZE	4				// header size (bytes)
+#define FTRSIZE	4				// footrer size (bytes)	
+#define WSIZE	4
+#define DSIZE	8
+#define CHUNKSIZE (1<<12)
+#define OVERHEAD 8
+
+#define MAX(x,y) ((x)>(y)?(x):(y))
+#define MIN(x,y) ((x)<(y)?(x):(y))
+
+/*Pack a size and alloctaed bit into a word */
+#define PACK(size,alloc) ((unsigned)((size)|(alloc)))
+
+/* Read and write a word at address p */
+#define GET(p) (*(unsigned *) (p))
+#define GET8(p) (*(unsigned long *)(p))
+#define PUT8(p,val) (*(unsigned long *)(p) = (unsigned long)(val))
+#define PUT(p,val) (*(unsigned *)(p) = (unsigned)(val))
+
+/* Read the size and allocated fields from address p */
+#define GET_SIZE(p) (GET(p) & ~0x7)
+#define GET_ALLOC(p) (GET(p) & 0x1)
+
+/* Given block ptr bp, compute address of its header and footer */
+#define HDRP(bp) ((char *)(bp) - WSIZE)
+#define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp))-DSIZE)
+
+/* Given block ptr bp, compute address of next and previous blocks */
+#define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)))
+#define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE((char *)(bp) -DSIZE))
+#define NEXT_FREEP(bp) ((char *)(bp))
+#define PREV_FREEP(bp) ((char *)(bp)+ WSIZE)
+#define NEXT_FREE_BLKP(bp) ((char *)GET8((char *)(bp)))
+#define PREV_FREE_BLKP(bp) ((char *)GET8((char *)(bp) + WSIZE))
+
 /*
  * Initialize: return -1 on error, 0 on success.
  */
