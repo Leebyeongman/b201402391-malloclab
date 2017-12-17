@@ -77,32 +77,103 @@
 #define NEXT_FREE_BLKP(bp) ((char *)GET8((char *)(bp)))
 #define PREV_FREE_BLKP(bp) ((char *)GET8((char *)(bp) + WSIZE))
 
+static void removeBlock(void *bp);
+void* coalesce(void* bp);
+static void place(void* bp, size_t asize);
+static void* find_fit(size_t asize);
+static void* extend_heap(size_t words);
+static char* epilogue =0;
+static char* h_ptr = 0;
+static char* heap_start = 0;
+
 /*
  * Initialize: return -1 on error, 0 on success.
  */
 int mm_init(void) {
-    return 0;
+
+	if((heap_start =(char *) mem_sbrk(DSIZE + 4 * HDRSIZE))==NULL)
+		return -1;
+		
+	h_ptr = heap_start;
+
+	PUT(h_ptr , NULL);
+	PUT(h_ptr+WSIZE, PACK(2 * OVERHEAD,1));
+	PUT(h_ptr+DSIZE, 0);
+	PUT(h_ptr+DSIZE + HDRSIZE,0);
+	PUT(h_ptr+DSIZE + HDRSIZE + FTRSIZE, PACK(2 * OVERHEAD,1));
+	PUT((h_ptr+DSIZE + 2 * HDRSIZE + FTRSIZE), PACK(0,1));
+							
+	h_ptr += DSIZE  ;
+
+	epilogue = h_ptr + DSIZE + WSIZE;
+	
+	if(( extend_heap(CHUNKSIZE/WSIZE)) == NULL)
+		return -1;
+
+	return 0;
 }
 
 /*
  * malloc
  */
 void *malloc (size_t size) {
-    return NULL;
-}
+	char *bp;
 
-/*
- * free
- */
-void free (void *ptr) {
-    if(!ptr) return;
+	if(size == 0){
+		return NULL;
+	}
+	size_t size1;
+	if(size <=DSIZE)
+		size1 = 2*DSIZE;
+	else
+		size1 = (size+7+8)& ~0x7 ;
+
+	if((bp = find_fit(size1))!=NULL){
+		place(bp,size1);
+		return bp;
+	}
+					
+	size_t size2 = MAX(size1, CHUNKSIZE);
+	if((bp = extend_heap(size2/WSIZE))== NULL)
+		return NULL;
+								
+	place(bp, size1);
+   	return bp;
 }
 
 /*
  * realloc - you may want to look at mm-naive.c
  */
 void *realloc(void *oldptr, size_t size) {
-    return NULL;
+    size_t oldsize;
+	void *newptr;
+
+	/* If size == 0 then this is just free, and we return NULL. */
+	if(size == 0) {
+	    free(oldptr);
+	    return 0;
+	}
+
+	/* If oldptr is NULL, then this is just malloc. */
+	if(oldptr == NULL) {
+		return malloc(size);
+    }
+
+    newptr = malloc(size);
+
+	/* If realloc() fails the original block is left untouched  */
+	if(!newptr) {
+		return 0;
+	}
+
+    /* Copy the old data. */
+    oldsize = GET_SIZE(HDRP(oldptr));
+    if(size < oldsize) oldsize = size;
+	    memcpy(newptr, oldptr, oldsize);
+
+	/* Free the old block. */
+	free(oldptr);
+	return newptr;
 }
 
 /*
@@ -111,7 +182,13 @@ void *realloc(void *oldptr, size_t size) {
  * needed to run the traces.
  */
 void *calloc (size_t nmemb, size_t size) {
-    return NULL;
+    size_t bytes = nmemb * size;
+	void *newptr;
+
+	newptr = malloc(bytes);
+	memset(newptr, 0, bytes);
+
+	return newptr;
 }
 
 
